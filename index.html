@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Slots Valley — Official Game Links</title>
+    <meta
+      name="description"
+      content="Slots Valley official portal. Verified player game links, chat support, and Facebook pages."
+    />
+    <meta name="theme-color" content="#141618" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Slots Valley" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@500;600;700&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="is-welcome">
+    <div class="page-bg" aria-hidden="true"></div>
+    <a class="skip-link" href="#games">Skip to game links</a>
+
+    <section class="welcome-gate" id="welcome-gate" aria-label="Welcome to Slots Valley">
+      <div class="welcome-stage" aria-hidden="true">
+        <div class="welcome-photo"></div>
+        <div class="welcome-veil"></div>
+        <div class="welcome-glow"></div>
+      </div>
+      <div class="welcome-sheet">
+        <div class="welcome-brand">
+          <img class="welcome-logo" src="/assets/icons/icon-512.png" width="96" height="96" alt="Slots Valley logo" />
+          <p class="welcome-name">Slots Valley</p>
+          <h1 class="welcome-title">Welcome to Slots Valley</h1>
+          <p class="welcome-lead">
+            Glad you’re here. Sign in to unlock verified game links, live support chat, and your player desk.
+          </p>
+        </div>
+
+        <div class="welcome-auth" id="chat-auth">
+          <div class="chat-auth-tabs" role="tablist">
+            <button type="button" class="chat-auth-tab is-active" id="chat-tab-signin" data-mode="signin">Sign in</button>
+            <button type="button" class="chat-auth-tab" id="chat-tab-signup" data-mode="signup">Sign up</button>
+          </div>
+
+          <form class="chat-intake welcome-form" id="chat-signin" autocomplete="on">
+            <label>
+              Email
+              <input id="chat-login-email" name="email" type="email" required maxlength="120" autocomplete="email" placeholder="you@email.com" />
+            </label>
+            <label>
+              Password
+              <input id="chat-login-password" name="password" type="password" required minlength="10" autocomplete="current-password" placeholder="Your password" />
+            </label>
+            <p class="chat-intake-error" id="chat-signin-error" hidden></p>
+            <button type="submit" class="btn btn-fill">Sign in &amp; enter</button>
+            <button type="button" class="welcome-forgot" id="chat-forgot-btn">Forgot password?</button>
+          </form>
+
+          <form class="chat-intake welcome-form" id="chat-forgot" hidden autocomplete="on">
+            <p class="chat-intake-title">Forgot password</p>
+            <p class="chat-verify-hint">Enter your account email and we’ll send a reset code.</p>
+            <label>
+              Email
+              <input id="chat-forgot-email" name="email" type="email" required maxlength="120" autocomplete="email" placeholder="you@email.com" />
+            </label>
+            <p class="chat-intake-error" id="chat-forgot-error" hidden></p>
+            <button type="submit" class="btn btn-fill">Send reset code</button>
+            <button type="button" class="btn btn-line" id="chat-forgot-back">Back to sign in</button>
+          </form>
+
+          <form class="chat-intake welcome-form" id="chat-reset" hidden autocomplete="on">
+            <p class="chat-intake-title">Set New password (min 10 chars)</p>
+            <p class="chat-verify-hint" id="chat-reset-hint">Enter the verification code and your New password (min 10 chars).</p>
+            <label>
+              Code
+              <input id="chat-reset-code" name="code" type="text" inputmode="text"  maxlength="96" required placeholder="Paste code from email" />
+            </label>
+            <label>
+              New password (min 10 chars)
+              <input id="chat-reset-password" name="password" type="password" required minlength="10" autocomplete="new-password" placeholder="New password (min 10 chars)" />
+            </label>
+            <p class="chat-intake-error" id="chat-reset-error" hidden></p>
+            <button type="submit" class="btn btn-fill">Update password &amp; enter</button>
+            <button type="button" class="btn btn-line" id="chat-reset-back">Back to sign in</button>
+          </form>
+
+          <form class="chat-intake welcome-form" id="chat-signup" hidden autocomplete="on">
+            <label>
+              Email
+              <input id="chat-reg-email" name="email" type="email" required maxlength="120" autocomplete="email" placeholder="you@email.com" />
+            </label>
+            <label>
+              Password
+              <input id="chat-reg-password" name="password" type="password" required minlength="10" autocomplete="new-password" placeholder="Password (min 10 chars)" />
+            </label>
+            <label>
+              Name
+              <input id="chat-reg-name" name="name" type="text" required maxlength="80" autocomplete="name" placeholder="Your name" />
+            </label>
+            <label>
+              Phone
+              <input id="chat-reg-phone" name="phone" type="tel" required maxlength="30" autocomplete="tel" placeholder="Phone number" />
+            </label>
+            <p class="chat-intake-error" id="chat-signup-error" hidden></p>
+            <button type="submit" class="btn btn-fill">Create account</button>
+          </form>
+
+          <form class="chat-intake welcome-form" id="chat-verify" hidden autocomplete="one-time-code">
+            <p class="chat-intake-title">Verify your email</p>
+            <p class="chat-verify-hint" id="chat-verify-hint">Enter the verification code we sent you — then you’re in.</p>
+            <p class="chat-code-box" id="chat-verify-code-box" hidden></p>
+            <label>
+              Code
+              <input id="chat-verify-code" name="code" type="text" inputmode="text"  maxlength="96" required placeholder="Paste code from email" />
+            </label>
+            <p class="chat-intake-error" id="chat-verify-error" hidden></p>
+            <button type="submit" class="btn btn-fill">Verify &amp; enter</button>
+            <button type="button" class="btn btn-line" id="chat-resend-btn">Resend code</button>
+          </form>
+        </div>
+      </div>
+
+      <button type="button" class="welcome-install" id="welcome-install-btn" hidden>
+        <span class="welcome-install-glow" aria-hidden="true"></span>
+        <span class="welcome-install-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v10" />
+            <path d="m8 9 4 4 4-4" />
+            <path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" />
+          </svg>
+        </span>
+        <span class="welcome-install-copy">
+          <strong>Install App</strong>
+          <small>Faster access · Alerts on</small>
+        </span>
+      </button>
+      <p class="welcome-install-hint" id="welcome-install-hint" hidden></p>
+    </section>
+
+    <div id="player-shell" class="player-shell" hidden>
+      <header class="player-bar">
+        <button type="button" class="player-burger" id="player-burger" aria-label="Open menu" aria-expanded="false" aria-controls="player-drawer">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="player-bar-brand">
+          <img src="/assets/icons/icon-192.png" width="28" height="28" alt="" />
+          <strong id="player-bar-title">Chat</strong>
+        </div>
+        <span class="player-bar-user" id="player-bar-user"></span>
+      </header>
+
+      <div class="player-drawer-backdrop" id="player-drawer-backdrop" hidden></div>
+      <nav class="player-drawer" id="player-drawer" hidden aria-label="Player menu">
+        <p class="player-drawer-label">Menu</p>
+        <button type="button" class="player-nav-btn is-active" data-player-view="chat">Chat</button>
+        <button type="button" class="player-nav-btn" data-player-view="spin">Spin</button>
+        <button type="button" class="player-nav-btn" data-player-view="games">Games</button>
+        <button type="button" class="player-nav-btn" data-player-view="settings">Settings</button>
+        <button type="button" class="player-logout" id="player-logout">Log out</button>
+      </nav>
+
+      <main class="player-main">
+        <section class="player-view is-active" id="player-view-chat" data-player-view="chat">
+          <div class="chat player-chat" id="chat">
+            <div class="chat-panel player-chat-panel" id="chat-panel">
+              <div class="chat-head">
+                <div class="chat-head-brand">
+                  <img src="/assets/icons/icon-192.png" width="28" height="28" alt="" />
+                  <div>
+                    <strong>Live chat</strong>
+                    <small id="chat-status">Connecting…</small>
+                  </div>
+                </div>
+              </div>
+
+              <div class="chat-quick" id="chat-quick" hidden>
+                <button type="button" data-quick="I need help with a deposit">Deposit</button>
+                <button type="button" data-quick="I need help with a withdrawal">Withdraw</button>
+                <button type="button" data-quick="I need help with game links">Games</button>
+                <button type="button" data-quick="I have a question about my account">Account</button>
+              </div>
+
+              <form class="chat-intake" id="chat-intake" hidden autocomplete="on">
+                <p class="chat-intake-title">Start chat</p>
+                <label>
+                  Name
+                  <input id="chat-name" name="name" type="text" required maxlength="60" autocomplete="name" placeholder="Your name" />
+                </label>
+                <label>
+                  Phone
+                  <input id="chat-phone" name="phone" type="tel" required maxlength="30" autocomplete="tel" placeholder="Phone number" />
+                </label>
+                <label>
+                  Email
+                  <input id="chat-email" name="email" type="email" required maxlength="120" autocomplete="email" placeholder="Email address" />
+                </label>
+                <p class="chat-intake-error" id="chat-intake-error" hidden></p>
+                <button type="submit" class="btn btn-fill" id="chat-start-btn">Start chatting</button>
+              </form>
+
+              <div class="chat-body" id="chat-body" hidden></div>
+
+              <form class="chat-form" id="chat-form" hidden>
+                <div class="chat-attach-row">
+                  <label class="chat-attach-btn" for="chat-file">Attach</label>
+                  <input type="file" id="chat-file" hidden accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt" />
+                  <button type="button" class="chat-attach-btn" id="chat-voice-btn">Voice</button>
+                  <button type="button" class="chat-attach-btn" id="chat-call-btn">Call</button>
+                  <button type="button" class="chat-attach-btn chat-hang-btn" id="chat-hang-btn" hidden>End call</button>
+                  <span class="chat-file-name" id="chat-file-name" hidden></span>
+                  <button type="button" class="chat-file-clear" id="chat-file-clear" hidden aria-label="Remove file">&times;</button>
+                </div>
+                <audio id="chat-local-audio" autoplay playsinline hidden></audio>
+                <audio id="chat-remote-audio" autoplay playsinline></audio>
+                <div class="chat-compose">
+                  <input id="chat-input" type="text" maxlength="2000" placeholder="Type a message…" autocomplete="off" />
+                  <button type="submit" class="btn btn-fill">Send</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="player-view" id="player-view-spin" data-player-view="spin" hidden>
+          <div class="player-spin-wrap">
+            <iframe
+              id="player-spin-frame"
+              class="player-spin-frame"
+              title="Spin and claim prize"
+              src="about:blank"
+              loading="lazy"
+              allow="clipboard-write"
+            ></iframe>
+          </div>
+        </section>
+
+        <section class="player-view" id="player-view-games" data-player-view="games" hidden>
+          <div class="player-games-head">
+            <h2>Game links</h2>
+            <p>Player doors only — verified Slots Valley links.</p>
+            <label class="search">
+              <span class="visually-hidden">Search games</span>
+              <input type="search" id="game-search" placeholder="Find a game" autocomplete="off" enterkeyhint="search" />
+              <button type="button" class="search-clear" id="search-clear" hidden aria-label="Clear search">Clear</button>
+            </label>
+            <p class="game-count" id="game-count" aria-live="polite"></p>
+            <p class="mode-hint" id="mode-hint" hidden>Showing <strong>player</strong> links</p>
+          </div>
+          <div class="game-grid is-loading" id="game-grid" aria-live="polite" aria-busy="true">
+            <div class="skel"></div>
+            <div class="skel"></div>
+            <div class="skel"></div>
+          </div>
+          <p class="empty-state" id="empty-state" hidden>No games match that search.</p>
+        </section>
+
+        <section class="player-view" id="player-view-settings" data-player-view="settings" hidden>
+          <div class="player-settings">
+            <h2>Settings</h2>
+            <p class="player-settings-lead">Update your contact details or password.</p>
+
+            <form id="player-profile-form" class="player-card" autocomplete="on">
+              <h3>Profile</h3>
+              <label>Name <input id="set-name" name="name" type="text" maxlength="80" autocomplete="name" /></label>
+              <label>Email <input id="set-email" name="email" type="email" maxlength="120" autocomplete="email" /></label>
+              <label>Phone <input id="set-phone" name="phone" type="tel" maxlength="30" autocomplete="tel" /></label>
+              <p class="chat-intake-error" id="set-profile-error" hidden></p>
+              <p class="player-settings-ok" id="set-profile-ok" hidden></p>
+              <button type="submit" class="btn btn-fill">Save profile</button>
+            </form>
+
+            <form id="player-password-form" class="player-card" autocomplete="on">
+              <h3>Password</h3>
+              <label>Current password <input id="set-pass-current" type="password" required minlength="10" autocomplete="current-password" /></label>
+              <label>New password (min 10 chars) <input id="set-pass-new" type="password" required minlength="10" autocomplete="new-password" /></label>
+              <p class="chat-intake-error" id="set-pass-error" hidden></p>
+              <p class="player-settings-ok" id="set-pass-ok" hidden></p>
+              <button type="submit" class="btn btn-fill">Update password</button>
+            </form>
+
+            <div class="player-card">
+              <h3>Notifications</h3>
+              <p class="player-settings-lead">Get alerts on this phone or laptop when support replies.</p>
+              <button type="button" class="btn btn-line" id="player-notify-btn">Enable notifications</button>
+              <p class="player-settings-ok" id="player-notify-status" hidden></p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="chat-media.js"></script>
+    <script src="chat.js"></script>
+    <script src="player-shell.js"></script>
+    <script src="pwa.js"></script>
+  </body>
+</html>

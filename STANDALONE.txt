@@ -1,0 +1,4 @@
+# Standalone Slots Valley app (not linked to Luckyspin git).
+# Run from this folder: npm install && npm start
+# Frontend brand: Slots Valley
+# ALLOWED_ORIGINS: slotsvalley999.com
