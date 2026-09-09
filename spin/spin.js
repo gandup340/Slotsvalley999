@@ -31,26 +31,64 @@
   let audioCtx = null;
   let dpr = 1;
   let prizeLocked = false;
+  let signedInProfile = null;
+  let claiming = false;
 
-  function readPlayerProfile() {
+  function mergeProfile(...parts) {
+    const out = { name: "", phone: "", email: "" };
+    for (const part of parts) {
+      if (!part || typeof part !== "object") continue;
+      if (part.name) out.name = String(part.name).trim();
+      if (part.phone) out.phone = String(part.phone).trim();
+      if (part.email) out.email = String(part.email).trim();
+    }
+    return out;
+  }
+
+  function readCachedProfile() {
     const fromQuery = {
       name: String(params.get("name") || "").trim(),
       phone: String(params.get("phone") || "").trim(),
       email: String(params.get("email") || "").trim(),
     };
+    let cached = null;
     try {
-      const cached = JSON.parse(localStorage.getItem(PLAYER_KEY) || "null");
-      if (cached && typeof cached === "object") {
-        return {
-          name: fromQuery.name || String(cached.name || "").trim(),
-          phone: fromQuery.phone || String(cached.phone || "").trim(),
-          email: fromQuery.email || String(cached.email || "").trim(),
-        };
-      }
+      cached = JSON.parse(localStorage.getItem(PLAYER_KEY) || "null");
     } catch {
-      /* ignore */
+      cached = null;
     }
-    return fromQuery;
+    return mergeProfile(cached, fromQuery);
+  }
+
+  function readPlayerProfile() {
+    return mergeProfile(readCachedProfile(), signedInProfile);
+  }
+
+  function profileComplete(profile) {
+    const phoneOk = String(profile?.phone || "").replace(/\D/g, "").length >= 7;
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(profile?.email || "").trim());
+    return Boolean(profile?.name && phoneOk && emailOk);
+  }
+
+  async function loadSignedInProfile() {
+    try {
+      const res = await fetch("/api/player/me", { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.player) return null;
+      signedInProfile = {
+        name: String(data.player.name || "").trim(),
+        phone: String(data.player.phone || "").trim(),
+        email: String(data.player.email || "").trim(),
+      };
+      try {
+        localStorage.setItem(PLAYER_KEY, JSON.stringify(data.player));
+      } catch {
+        /* ignore */
+      }
+      return signedInProfile;
+    } catch {
+      return null;
+    }
   }
 
   function fillClaimFields(profile) {
@@ -102,8 +140,72 @@
     const res = await fetch(`/api/spin/check?deviceId=${encodeURIComponent(deviceId)}`);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Could not check eligibility");
-    if (data.used) throw new Error(cooldownMessage(data));
     return data;
+  }
+
+  async function submitClaim(profile) {
+    if (claiming) return;
+    claiming = true;
+    claimError.hidden = true;
+    try {
+      const res = await fetch("/api/spin/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          spinId: currentSpinId,
+          name: profile.name,
+          phone: profile.phone,
+          email: profile.email,
+          deviceId: getDeviceId(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(cooldownMessage(data) || data.error || "Could not claim prize");
+
+      claimModal.hidden = true;
+      prizeLocked = true;
+      const when = formatWhen(data.nextAvailableAt);
+      setStatus(
+        when
+          ? `Claimed ${currentPrize?.label || "prize"} — next prize after ${when}`
+          : `Claimed ${currentPrize?.label || "prize"} — next prize in 7 days`
+      );
+      spinBtn.disabled = true;
+      claimForm?.reset();
+      return data;
+    } finally {
+      claiming = false;
+    }
+  }
+
+  async function openClaim(prize, { auto = true } = {}) {
+    currentPrize = prize;
+    claimTitle.textContent = prize.label;
+    const profile = readPlayerProfile();
+    const signedIn = Boolean(signedInProfile?.email || profileComplete(profile));
+    const hasProfile = profileComplete(profile);
+    claimCopy.textContent = hasProfile
+      ? signedIn
+        ? "Using your account details to claim this prize…"
+        : "Confirm your details to claim this prize."
+      : "Enter your name, phone, and email to claim this prize.";
+    claimError.hidden = true;
+    fillClaimFields(profile);
+    claimModal.hidden = false;
+
+    if (auto && hasProfile) {
+      try {
+        setStatus(`Claiming ${prize.label} with your account…`);
+        await submitClaim(profile);
+        return;
+      } catch (err) {
+        claimError.hidden = false;
+        claimError.textContent = err.message || "Could not claim prize";
+        claimCopy.textContent = "Confirm or edit your details to claim this prize.";
+      }
+    }
+    document.getElementById("claim-name")?.focus();
   }
 
   const COLORS_A = ["#b42318", "#0f1419", "#c45c12", "#12181f", "#8f1d14"];
@@ -345,20 +447,6 @@
     requestAnimationFrame(loop);
   }
 
-  function openClaim(prize) {
-    currentPrize = prize;
-    claimTitle.textContent = prize.label;
-    const profile = readPlayerProfile();
-    const hasProfile = Boolean(profile.name && profile.phone && profile.email);
-    claimCopy.textContent = hasProfile
-      ? "Confirm your details to claim this prize."
-      : "Enter your name, phone, and email to claim this prize.";
-    claimError.hidden = true;
-    fillClaimFields(profile);
-    claimModal.hidden = false;
-    document.getElementById("claim-name")?.focus();
-  }
-
   async function loadPrizes() {
     const res = await fetch("/api/spin");
     if (!res.ok) throw new Error("Could not load spin prizes");
@@ -382,7 +470,15 @@
     setStatus("Good luck...");
 
     try {
-      await checkDeviceCooldown();
+      const check = await checkDeviceCooldown();
+      if (check.used && check.pending && check.spinId && check.prize) {
+        currentSpinId = check.spinId;
+        prizeLocked = true;
+        setStatus(`You still have ${check.prize.label} to claim`);
+        await openClaim(check.prize);
+        return;
+      }
+      if (check.used) throw new Error(cooldownMessage(check));
 
       const res = await fetch("/api/spin/play", {
         method: "POST",
@@ -413,7 +509,7 @@
       } else {
         winSound();
         burstConfetti();
-        setStatus(`Winner: ${data.prize.label} — enter phone to claim`);
+        setStatus(`Winner: ${data.prize.label}`);
         setTimeout(() => openClaim(data.prize), 450);
         // Keep spin locked until they claim (or refresh)
       }
@@ -427,33 +523,13 @@
 
   claimForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    claimError.hidden = true;
     const profile = {
       name: document.getElementById("claim-name").value.trim(),
       phone: document.getElementById("claim-phone").value.trim(),
       email: document.getElementById("claim-email").value.trim(),
-      deviceId: getDeviceId(),
     };
-
     try {
-      const res = await fetch("/api/spin/claim", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spinId: currentSpinId, ...profile }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(cooldownMessage(data) || data.error || "Could not claim prize");
-
-      claimModal.hidden = true;
-      prizeLocked = true;
-      const when = formatWhen(data.nextAvailableAt);
-      setStatus(
-        when
-          ? `Claimed ${currentPrize?.label || "prize"} — next prize after ${when}`
-          : `Claimed ${currentPrize?.label || "prize"} — next prize in 7 days`
-      );
-      spinBtn.disabled = true;
-      claimForm.reset();
+      await submitClaim(profile);
     } catch (err) {
       claimError.hidden = false;
       claimError.textContent = err.message || "Could not claim prize";
@@ -465,15 +541,27 @@
   });
 
   async function boot() {
-    await loadPrizes();
-    try {
-      await checkDeviceCooldown();
-      setStatus("Tap SPIN to play");
-    } catch (err) {
+    await Promise.all([loadPrizes(), loadSignedInProfile()]);
+    const check = await checkDeviceCooldown();
+    if (check.used && check.pending && check.spinId && check.prize) {
+      currentSpinId = check.spinId;
       prizeLocked = true;
-      setStatus(err.message);
       spinBtn.disabled = true;
+      setStatus(`You still have ${check.prize.label} to claim`);
+      await openClaim(check.prize);
+      return;
     }
+    if (check.used) {
+      prizeLocked = true;
+      spinBtn.disabled = true;
+      setStatus(cooldownMessage(check));
+      return;
+    }
+    setStatus(
+      profileComplete(readPlayerProfile())
+        ? "Tap SPIN to play — wins claim with your account"
+        : "Tap SPIN to play"
+    );
   }
 
   boot().catch((err) => {

@@ -713,12 +713,14 @@ function fingerprintIp(ip) {
 }
 
 /** Recent winning spin for phone, device, and/or IP fingerprint (within 7 days). */
-function findClaimedCooldown({ digits = "", deviceId = "", ipHash = "" } = {}) {
+function findClaimedCooldown({ digits = "", deviceId = "", ipHash = "", excludeSpinId = "" } = {}) {
   if (!digits && !deviceId && !ipHash) return null;
   const data = getSpins();
   const now = Date.now();
+  const skipId = String(excludeSpinId || "");
   let match = null;
   for (const spin of data.spins || []) {
+    if (skipId && String(spin.id) === skipId) continue;
     if (!isWithinPrizeCooldown(spin, now)) continue;
     const phoneMatch =
       digits &&
@@ -739,6 +741,13 @@ function cooldownResponse(spin, reason) {
   return {
     used: true,
     claimed,
+    pending: !claimed,
+    spinId: spin?.id || null,
+    prize: spin?.prizeId
+      ? { id: spin.prizeId, label: spin.prizeLabel }
+      : spin?.prizeLabel
+        ? { id: "", label: spin.prizeLabel }
+        : null,
     reason: by,
     spunAt,
     nextAvailableAt,
@@ -1717,11 +1726,11 @@ app.post("/api/spin/claim", spinLimiter, (req, res) => {
     return res.status(400).json({ error: "Device must match the one used to spin." });
   }
 
-  const phoneHit = findClaimedCooldown({ digits });
+  const phoneHit = findClaimedCooldown({ digits, excludeSpinId: spinId });
   if (phoneHit) {
     return res.status(409).json(cooldownResponse(phoneHit, "phone"));
   }
-  const deviceHit = findClaimedCooldown({ deviceId });
+  const deviceHit = findClaimedCooldown({ deviceId, excludeSpinId: spinId });
   if (deviceHit) {
     return res.status(409).json(cooldownResponse(deviceHit, "device"));
   }
