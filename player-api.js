@@ -7,7 +7,6 @@ const {
   hashVerifyCode,
   verifyCodeMatch,
   brandEmailHtml,
-  emailConfigured,
 } = require("./mail");
 const { validatePlayerPassword, MIN_PLAYER_PASSWORD } = require("./password-policy");
 const { auditLog, clientIp } = require("./audit-log");
@@ -294,12 +293,6 @@ function mountPlayerApi(app, { auth, requireAdmin, playerAuthIpLimiter, playerAu
         return res.status(400).json({ error: "Enter a valid phone number" });
       }
 
-      if (!emailConfigured() && (process.env.NODE_ENV === "production" || process.env.RENDER)) {
-        return res.status(503).json({
-          error: "Email service is not configured. Registration is temporarily unavailable.",
-        });
-      }
-
       let referredBy = null;
       if (referralFrom) {
         const ref = await query(`SELECT id FROM players WHERE referral_code = $1`, [referralFrom]);
@@ -313,7 +306,7 @@ function mountPlayerApi(app, { auth, requireAdmin, playerAuthIpLimiter, playerAu
         try {
           const inserted = await query(
             `INSERT INTO players (username, password_hash, name, phone, email, referral_code, referred_by, email_verified)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,false)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,true)
              RETURNING *`,
             [username, passwordHash, name || username, phone, email, referralCode, referredBy]
           );
@@ -347,31 +340,7 @@ function mountPlayerApi(app, { auth, requireAdmin, playerAuthIpLimiter, playerAu
         );
       }
 
-      const mail = await issueVerification(player);
-      if (!mail.sent && !maybeDevCode(mail)) {
-        auditLog({
-          category: "auth",
-          action: "register",
-          actor: email,
-          ip: clientIp(req),
-          success: false,
-          message: "smtp unavailable",
-        });
-        return res.status(503).json({
-          error: "Could not send verification email. Try again later.",
-        });
-      }
-      const payload = {
-        ok: true,
-        needsVerification: true,
-        email,
-        message: mail.sent
-          ? "Check your email for a verification code."
-          : "Email sending is not configured — use the code shown below (dev only).",
-        player: publicPlayer({ ...player, email_verified: false }),
-      };
-      const devCode = maybeDevCode(mail);
-      if (devCode) payload.devCode = devCode;
+      const token = await createSession(player.id);
       auditLog({
         category: "auth",
         action: "register",
@@ -379,7 +348,7 @@ function mountPlayerApi(app, { auth, requireAdmin, playerAuthIpLimiter, playerAu
         ip: clientIp(req),
         success: true,
       });
-      res.json(payload);
+      return sendAuth(res, req, { token, player: publicPlayer(player) });
     } catch (err) {
       console.error("register:", err.message || err);
       res.status(500).json({ error: "Registration failed" });
@@ -614,24 +583,18 @@ function mountPlayerApi(app, { auth, requireAdmin, playerAuthIpLimiter, playerAu
         return res.status(401).json({ error: "Invalid email or password" });
       }
 
+      // Email is only an account identifier — no verification gate on login.
       if (player.email && !player.email_verified) {
-        if (!player.email_verify_code_hash) {
-          await query(`UPDATE players SET email_verified = true, updated_at = now() WHERE id = $1`, [
-            player.id,
-          ]);
-          player.email_verified = true;
-        } else {
-          const mail = await issueVerification(player, { reason: "resend" });
-          const payload = {
-            ok: false,
-            needsVerification: true,
-            email: player.email,
-            error: "Verify your email before signing in.",
-          };
-          const devCode = maybeDevCode(mail);
-          if (devCode) payload.devCode = devCode;
-          return res.status(403).json(payload);
-        }
+        await query(
+          `UPDATE players
+           SET email_verified = true,
+               email_verify_code_hash = NULL,
+               email_verify_expires_at = NULL,
+               updated_at = now()
+           WHERE id = $1`,
+          [player.id]
+        );
+        player.email_verified = true;
       }
 
       const token = await createSession(player.id);
@@ -690,29 +653,14 @@ function mountPlayerApi(app, { auth, requireAdmin, playerAuthIpLimiter, playerAu
       }
       const updated = await query(
         `UPDATE players SET name=$2, phone=$3, email=$4, facebook_name=$5,
-           email_verified = CASE WHEN $6 THEN false ELSE email_verified END,
+           email_verified = true,
+           email_verify_code_hash = NULL,
+           email_verify_expires_at = NULL,
            updated_at=now()
          WHERE id=$1 RETURNING *`,
-        [req.player.id, name, phone, nextEmail, facebookName, emailChanged]
+        [req.player.id, name, phone, nextEmail, facebookName]
       );
-      let player = updated.rows[0];
-      let payload = { ok: true, player: publicPlayer(player) };
-      if (emailChanged) {
-        const mail = await issueVerification(player);
-        if (!mail.sent && !(process.env.NODE_ENV !== "production" && !process.env.RENDER && mail.previewCode)) {
-          return res.status(503).json({
-            ok: false,
-            error: "Could not send verification email for the new address.",
-            player: publicPlayer(player),
-          });
-        }
-        payload.needsVerification = true;
-        payload.message = "Verify your new email address.";
-        if (process.env.NODE_ENV !== "production" && !process.env.RENDER && mail.previewCode) {
-          payload.devCode = mail.previewCode;
-        }
-      }
-      res.json(payload);
+      res.json({ ok: true, player: publicPlayer(updated.rows[0]) });
     } catch (err) {
       if (String(err.code) === "23505") {
         return res.status(409).json({ error: "Email already in use" });

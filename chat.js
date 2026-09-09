@@ -653,11 +653,12 @@
         return;
       }
       const { res, data } = await api("/api/player/register", { email, password, name, phone });
-      if (!res.ok) {
+      if (!res.ok || !data.ok || !data.player) {
         setError(errEl, data.error || "Sign up failed");
         return;
       }
-      showVerify(email, data.message, data.devCode);
+      cachePlayer(data.player);
+      startChatWithPlayer(data.player);
     });
   });
 
