@@ -1,5 +1,5 @@
 /* Slots Valley — service worker (PWA cache + Web Push) */
-const CACHE_NAME = "slots-valley-shell-v4";
+const CACHE_NAME = "slots-valley-shell-v5";
 const PRECACHE = [
   "/",
   "/index.html",
