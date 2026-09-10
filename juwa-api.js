@@ -545,6 +545,88 @@ function mountJuwaApi(app, { auth, requireAdmin, dataDir, readJson, writeJson, p
     res.json({ ...created, request, parsed });
   });
 
+  app.post("/api/admin/juwa/requests/manual", auth, (req, res) => {
+    const game = String(req.body?.game || "").trim().toLowerCase();
+    const username = String(req.body?.username || "").trim().slice(0, 64);
+    const method = String(req.body?.method || "").trim().slice(0, 60);
+    let amount = Number(req.body?.amount);
+    const allowed = new Set(["juwa", "juwa2", "milkyway", "gamevault", "orion"]);
+    if (!allowed.has(game)) {
+      return res.status(400).json({ error: "Select a valid game" });
+    }
+    if (!username) return res.status(400).json({ error: "Username is required" });
+    if (!method) return res.status(400).json({ error: "Method is required" });
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: "Enter a valid amount greater than 0" });
+    }
+    amount = Math.round(amount * 100) / 100;
+    const markAdded = String(req.body?.markAdded || "").trim() === "1" || req.body?.markAdded === true;
+    const admin = actorName(req);
+
+    const created = store.createRequest({
+      ok: true,
+      conversationId: "",
+      messageId: "",
+      messageText: `Manual entry by ${admin}`,
+      game,
+      username,
+      amount,
+      method,
+      missing: [],
+      reason: "Manual add-funds entry",
+      usernames: [username],
+    });
+
+    if (created.error && !created.request) {
+      return res.status(409).json(created);
+    }
+
+    let request = created.request;
+    store.addAudit({
+      type: "request_created",
+      requestId: request?.id,
+      admin,
+      username,
+      amount,
+      status: request?.status,
+      message: created.reused ? "Reused existing manual request" : "Created manually",
+    });
+
+    if (markAdded && request) {
+      store.updateRequest(request.id, {
+        username,
+        amount,
+        game,
+        method,
+        status: "success",
+        confirmedBy: admin,
+        confirmedAt: Date.now(),
+        missing: [],
+        error: "",
+        reason: "Marked added manually",
+        result: { ok: true, status: "success", detail: "Manual mark added (no chat reply)" },
+        playerRepliedAt: Date.now(),
+      });
+      store.addAudit({
+        type: "marked_added",
+        requestId: request.id,
+        admin,
+        username,
+        amount,
+        status: "success",
+        message: `Manual mark added (${method})`,
+      });
+      request = store.getRequest(request.id);
+    }
+
+    res.json({
+      ok: true,
+      request,
+      reused: Boolean(created.reused),
+      message: markAdded ? "Saved and marked added" : "Manual request saved",
+    });
+  });
+
   app.get("/api/admin/juwa/requests", auth, (req, res) => {
     res.json({ requests: store.listRequests({ limit: Number(req.query.limit) || 50 }) });
   });
@@ -555,7 +637,7 @@ function mountJuwaApi(app, { auth, requireAdmin, dataDir, readJson, writeJson, p
     res.json({ request: row });
   });
 
-  app.get("/api/admin/juwa/audits", auth, requireAdmin, (req, res) => {
+  app.get("/api/admin/juwa/audits", auth, (req, res) => {
     res.json({ audits: store.listAudits({ limit: Number(req.query.limit) || 100 }) });
   });
 
@@ -569,6 +651,7 @@ function mountJuwaApi(app, { auth, requireAdmin, dataDir, readJson, writeJson, p
     let username = String(req.body?.username || row.username || "").trim();
     let amount = req.body?.amount != null ? Number(req.body.amount) : row.amount;
     const game = String(req.body?.game || row.game || "").toLowerCase();
+    const method = String(req.body?.method != null ? req.body.method : row.method || "").trim().slice(0, 60);
     if (!username || !Number.isFinite(amount) || amount <= 0) {
       const err = "Need an exact username and a positive amount before marking added.";
       if (row.conversationId) {
@@ -583,6 +666,7 @@ function mountJuwaApi(app, { auth, requireAdmin, dataDir, readJson, writeJson, p
       username,
       amount,
       game: game || row.game || null,
+      method: method || row.method || "",
       status: "success",
       confirmedBy: admin,
       confirmedAt: Date.now(),
@@ -599,7 +683,7 @@ function mountJuwaApi(app, { auth, requireAdmin, dataDir, readJson, writeJson, p
       amount,
       status: "success",
       conversationId: row.conversationId,
-      message: "Admin marked funds added",
+      message: method ? `Admin marked funds added (${method})` : "Admin marked funds added",
     });
 
     const fresh = store.getRequest(row.id);

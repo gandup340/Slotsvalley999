@@ -221,6 +221,9 @@
       await loadPlayerDeposits();
       await loadPlayerWithdrawals();
       await loadPlayersDb();
+      const dashDate = document.getElementById("dashboard-date");
+      if (dashDate && !dashDate.value) dashDate.value = todayInputValue();
+      await loadDashboard();
     } else {
       config = { winners: [], spinPrizes: [] };
       const winnersData = await api("/api/admin/winners");
@@ -228,12 +231,13 @@
       renderWinners();
       await loadSpin();
       await loadCustomers();
+      await loadPush();
     }
 
     await refreshChats();
     connectWs();
     setupJuwaUi();
-    if (isAdminUser()) await loadJuwaOps();
+    await loadJuwaOps();
   }
 
   async function loadSpin() {
@@ -532,6 +536,7 @@
 
   async function loadPush() {
     const meta = document.getElementById("push-meta");
+    const grid = document.getElementById("notify-template-grid");
     try {
       const data = await api("/api/admin/push");
       if (meta) {
@@ -546,7 +551,40 @@
         meta.classList.add("error");
       }
     }
+    if (grid && !grid.dataset.ready) {
+      try {
+        const tpl = await api("/api/admin/push/templates");
+        const list = tpl.templates || [];
+        grid.innerHTML = list
+          .map(
+            (t) => `<button type="button" class="notify-template-btn" data-tpl-id="${esc(t.id)}">
+              <strong>${esc(t.label)}</strong>
+              <small>${esc(t.title)}</small>
+            </button>`
+          )
+          .join("");
+        grid.dataset.ready = "1";
+        grid.querySelectorAll("[data-tpl-id]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const t = list.find((x) => x.id === btn.dataset.tplId);
+            if (!t) return;
+            const title = document.getElementById("push-title");
+            const body = document.getElementById("push-body");
+            const url = document.getElementById("push-url");
+            if (title) title.value = t.title || "";
+            if (body) body.value = t.body || "";
+            if (url) url.value = t.url || "/";
+            pushFormTag = t.tag || "slot-valley";
+            setStatus("push-status", `Template loaded: ${t.label}`);
+          });
+        });
+      } catch (err) {
+        grid.innerHTML = `<p class="status error">${esc(err.message || "Could not load templates")}</p>`;
+      }
+    }
   }
+
+  let pushFormTag = "slot-valley";
 
   document.getElementById("push-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -558,6 +596,7 @@
           body: document.getElementById("push-body").value,
           url: document.getElementById("push-url").value || "/",
           icon: document.getElementById("push-icon").value || "/assets/icons/icon-192.png",
+          tag: pushFormTag || "slot-valley",
         }),
       });
       setStatus(
@@ -570,117 +609,216 @@
     }
   });
 
+  document.querySelector('.nav-btn[data-tab="notify"]')?.addEventListener("click", () => {
+    loadPush().catch(() => {});
+  });
+
   function money(cents) {
     return `$${(Number(cents || 0) / 100).toFixed(2)}`;
   }
 
-  async function loadPlayerDeposits() {
-    const body = document.getElementById("deposits-body");
-    if (!body) return;
+  function moneyDollars(amount) {
+    return `$${Number(amount || 0).toFixed(2)}`;
+  }
+
+  function fmtWhen(ms) {
+    if (!ms) return "—";
     try {
-      const data = await api("/api/admin/player-deposits");
-      body.innerHTML = (data.deposits || [])
-        .map((d) => {
-          const actions =
-            d.status === "pending"
-              ? `<button type="button" data-dep-approve="${d.id}">Approve</button>
-                 <button type="button" class="danger" data-dep-reject="${d.id}">Reject</button>`
-              : "—";
-          return `<tr>
-            <td>${esc(d.name || d.username || "")}</td>
-            <td>${money(d.amountCents)}</td>
-            <td>${esc(d.method || "")}<br/><small>${esc(d.reference || "")}</small></td>
-            <td>${esc(d.status)}</td>
-            <td>${actions}</td>
-          </tr>`;
-        })
-        .join("");
-      body.querySelectorAll("[data-dep-approve]").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          try {
-            await api(`/api/admin/player-deposits/${btn.dataset.depApprove}/approve`, {
-              method: "POST",
-              body: "{}",
-            });
-            await loadPlayerDeposits();
-            setStatus("deposits-status", "Approved");
-          } catch (err) {
-            setStatus("deposits-status", err.message, true);
-          }
-        });
-      });
-      body.querySelectorAll("[data-dep-reject]").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          try {
-            await api(`/api/admin/player-deposits/${btn.dataset.depReject}/reject`, {
-              method: "POST",
-              body: "{}",
-            });
-            await loadPlayerDeposits();
-            setStatus("deposits-status", "Rejected");
-          } catch (err) {
-            setStatus("deposits-status", err.message, true);
-          }
-        });
-      });
-    } catch (err) {
-      setStatus("deposits-status", err.message, true);
+      return new Date(ms).toLocaleString();
+    } catch {
+      return "—";
     }
   }
 
-  async function loadPlayerWithdrawals() {
-    const body = document.getElementById("withdrawals-body");
+  function todayInputValue() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function bindCashRowActions(body, type, statusId, reload) {
+    body.querySelectorAll("[data-cash-save]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const row = btn.closest("tr");
+        try {
+          await api(`/api/admin/cash/${btn.dataset.cashSave}`, {
+            method: "PUT",
+            body: JSON.stringify({
+              type,
+              playerName: row.querySelector('[data-field="playerName"]').value,
+              method: row.querySelector('[data-field="method"]').value,
+              amount: row.querySelector('[data-field="amount"]').value,
+              games: row.querySelector('[data-field="games"]').value,
+            }),
+          });
+          setStatus(statusId, "Saved");
+          await reload();
+        } catch (err) {
+          setStatus(statusId, err.message, true);
+        }
+      });
+    });
+    body.querySelectorAll("[data-cash-del]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Delete this entry?")) return;
+        try {
+          await api(`/api/admin/cash/${btn.dataset.cashDel}`, { method: "DELETE" });
+          setStatus(statusId, "Deleted");
+          await reload();
+        } catch (err) {
+          setStatus(statusId, err.message, true);
+        }
+      });
+    });
+  }
+
+  async function loadCashEntries(type) {
+    const isDeposit = type === "deposit";
+    const body = document.getElementById(isDeposit ? "deposits-body" : "withdrawals-body");
+    const statusId = isDeposit ? "deposits-status" : "withdrawals-status";
     if (!body) return;
     try {
-      const data = await api("/api/admin/player-withdrawals");
-      body.innerHTML = (data.withdrawals || [])
-        .map((w) => {
-          const actions =
-            w.status === "pending"
-              ? `<button type="button" data-wd-approve="${w.id}">Approve</button>
-                 <button type="button" class="danger" data-wd-reject="${w.id}">Reject</button>`
-              : "—";
-          return `<tr>
-            <td>${esc(w.name || w.username || "")}</td>
-            <td>${money(w.amountCents)}</td>
-            <td>${esc(w.method || "")}<br/><small>${esc(w.destination || "")}</small></td>
-            <td>${esc(w.status)}</td>
-            <td>${actions}</td>
-          </tr>`;
-        })
+      const data = await api(`/api/admin/cash?type=${type}`);
+      const entries = data.entries || [];
+      if (!entries.length) {
+        body.innerHTML = `<tr class="table-empty"><td colspan="6">No ${type}s yet. Add one above.</td></tr>`;
+        return;
+      }
+      body.innerHTML = entries
+        .map(
+          (e) => `<tr data-id="${esc(e.id)}">
+            <td data-label="Player"><input data-field="playerName" value="${esc(e.playerName || "")}" /></td>
+            <td data-label="Method"><input data-field="method" value="${esc(e.method || "")}" /></td>
+            <td data-label="Amount"><input data-field="amount" type="number" min="0.01" step="0.01" value="${esc(e.amount)}" /></td>
+            <td data-label="Games"><input data-field="games" value="${esc(e.games || "")}" /></td>
+            <td data-label="When">${esc(fmtWhen(e.createdAt))}</td>
+            <td data-label="Actions" class="user-actions">
+              <button type="button" class="btn-mini" data-cash-save="${esc(e.id)}">Save</button>
+              <button type="button" class="btn-mini danger" data-cash-del="${esc(e.id)}">Delete</button>
+            </td>
+          </tr>`
+        )
         .join("");
-      body.querySelectorAll("[data-wd-approve]").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          try {
-            await api(`/api/admin/player-withdrawals/${btn.dataset.wdApprove}/approve`, {
-              method: "POST",
-              body: "{}",
-            });
-            await loadPlayerWithdrawals();
-            setStatus("withdrawals-status", "Approved");
-          } catch (err) {
-            setStatus("withdrawals-status", err.message, true);
-          }
-        });
+      bindCashRowActions(body, type, statusId, () => loadCashEntries(type));
+    } catch (err) {
+      setStatus(statusId, err.message, true);
+    }
+  }
+
+  async function loadPlayerDeposits() {
+    return loadCashEntries("deposit");
+  }
+
+  async function loadPlayerWithdrawals() {
+    return loadCashEntries("withdrawal");
+  }
+
+  document.getElementById("add-deposit-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api("/api/admin/cash", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "deposit",
+          playerName: document.getElementById("new-deposit-name").value,
+          method: document.getElementById("new-deposit-method").value,
+          amount: document.getElementById("new-deposit-amount").value,
+          games: document.getElementById("new-deposit-games").value,
+        }),
       });
-      body.querySelectorAll("[data-wd-reject]").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          try {
-            await api(`/api/admin/player-withdrawals/${btn.dataset.wdReject}/reject`, {
-              method: "POST",
-              body: "{}",
-            });
-            await loadPlayerWithdrawals();
-            setStatus("withdrawals-status", "Rejected");
-          } catch (err) {
-            setStatus("withdrawals-status", err.message, true);
-          }
-        });
+      e.target.reset();
+      setStatus("deposits-status", "Deposit added");
+      await loadPlayerDeposits();
+    } catch (err) {
+      setStatus("deposits-status", err.message, true);
+    }
+  });
+
+  document.getElementById("add-withdrawal-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api("/api/admin/cash", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "withdrawal",
+          playerName: document.getElementById("new-withdrawal-name").value,
+          method: document.getElementById("new-withdrawal-method").value,
+          amount: document.getElementById("new-withdrawal-amount").value,
+          games: document.getElementById("new-withdrawal-games").value,
+        }),
       });
+      e.target.reset();
+      setStatus("withdrawals-status", "Withdrawal added");
+      await loadPlayerWithdrawals();
     } catch (err) {
       setStatus("withdrawals-status", err.message, true);
     }
+  });
+
+  document.getElementById("refresh-deposits-btn")?.addEventListener("click", () => loadPlayerDeposits());
+  document.getElementById("refresh-withdrawals-btn")?.addEventListener("click", () => loadPlayerWithdrawals());
+
+  async function loadDashboard(date) {
+    const day = date || document.getElementById("dashboard-date")?.value || todayInputValue();
+    const cards = document.getElementById("dashboard-cards");
+    const playersBody = document.getElementById("dashboard-players-body");
+    const entriesBody = document.getElementById("dashboard-entries-body");
+    try {
+      const data = await api(`/api/admin/cash-dashboard?date=${encodeURIComponent(day)}`);
+      if (cards) {
+        cards.innerHTML = `
+          <div class="dash-card"><span>Date</span><strong>${esc(data.date)}</strong></div>
+          <div class="dash-card"><span>Total in</span><strong>${esc(moneyDollars(data.totalIn))}</strong></div>
+          <div class="dash-card"><span>Total out</span><strong>${esc(moneyDollars(data.totalOut))}</strong></div>
+          <div class="dash-card"><span>Net</span><strong>${esc(moneyDollars(data.net))}</strong></div>
+          <div class="dash-card"><span>Entries</span><strong>${esc(data.entryCount || 0)}</strong></div>`;
+      }
+      if (playersBody) {
+        const rows = data.byPlayer || [];
+        playersBody.innerHTML = rows.length
+          ? rows
+              .map(
+                (p) => `<tr>
+                  <td data-label="Player">${esc(p.playerName)}</td>
+                  <td data-label="In">${esc(moneyDollars(p.in))}</td>
+                  <td data-label="Out">${esc(moneyDollars(p.out))}</td>
+                  <td data-label="Net">${esc(moneyDollars(p.net))}</td>
+                  <td data-label="# Dep">${esc(p.deposits)}</td>
+                  <td data-label="# Wd">${esc(p.withdrawals)}</td>
+                </tr>`
+              )
+              .join("")
+          : `<tr class="table-empty"><td colspan="6">No cash activity for this day.</td></tr>`;
+      }
+      if (entriesBody) {
+        const rows = data.entries || [];
+        entriesBody.innerHTML = rows.length
+          ? rows
+              .map(
+                (e) => `<tr>
+                  <td data-label="Type">${esc(e.type)}</td>
+                  <td data-label="Player">${esc(e.playerName)}</td>
+                  <td data-label="Method">${esc(e.method)}</td>
+                  <td data-label="Amount">${esc(moneyDollars(e.amount))}</td>
+                  <td data-label="Games">${esc(e.games || "—")}</td>
+                  <td data-label="When">${esc(fmtWhen(e.createdAt))}</td>
+                </tr>`
+              )
+              .join("")
+          : `<tr class="table-empty"><td colspan="6">No entries.</td></tr>`;
+      }
+      setStatus("dashboard-status", "Updated");
+    } catch (err) {
+      setStatus("dashboard-status", err.message, true);
+    }
   }
+
+  document.getElementById("dashboard-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await loadDashboard();
+  });
 
   async function loadPlayersDb() {
     const body = document.getElementById("players-body");
@@ -844,10 +982,95 @@
   // Customers
   let customers = [];
 
-  async function loadCustomers() {
-    const data = await api("/api/admin/customers");
+  let customerSearchQ = "";
+
+  async function loadCustomers(q) {
+    const query = q == null ? customerSearchQ : String(q || "").trim();
+    customerSearchQ = query;
+    const path = query
+      ? `/api/admin/customers?q=${encodeURIComponent(query)}`
+      : "/api/admin/customers";
+    const data = await api(path);
     customers = data.customers || [];
     renderCustomers();
+  }
+
+  function hideCustomerHistory() {
+    const box = document.getElementById("customer-history");
+    if (box) box.hidden = true;
+  }
+
+  async function openCustomerHistory(id) {
+    const box = document.getElementById("customer-history");
+    if (!box) return;
+    try {
+      const data = await api(`/api/admin/customers/${id}/history`);
+      const title = document.getElementById("customer-history-title");
+      const sub = document.getElementById("customer-history-sub");
+      const totals = document.getElementById("customer-history-totals");
+      const depBody = document.getElementById("customer-history-deposits");
+      const wdBody = document.getElementById("customer-history-withdrawals");
+      const spinBody = document.getElementById("customer-history-spins");
+      if (title) title.textContent = data.customer?.name || "Customer history";
+      if (sub) {
+        sub.textContent = [data.customer?.phone, data.customer?.email].filter(Boolean).join(" · ");
+      }
+      if (totals) {
+        totals.innerHTML = `
+          <div class="dash-card"><span>Total in</span><strong>${esc(moneyDollars(data.totals?.in))}</strong></div>
+          <div class="dash-card"><span>Total out</span><strong>${esc(moneyDollars(data.totals?.out))}</strong></div>
+          <div class="dash-card"><span>Net</span><strong>${esc(moneyDollars(data.totals?.net))}</strong></div>`;
+      }
+      if (depBody) {
+        const rows = data.deposits || [];
+        depBody.innerHTML = rows.length
+          ? rows
+              .map(
+                (e) => `<tr>
+                  <td>${esc(fmtWhen(e.createdAt))}</td>
+                  <td>${esc(e.method)}</td>
+                  <td>${esc(moneyDollars(e.amount))}</td>
+                  <td>${esc(e.games || "—")}</td>
+                </tr>`
+              )
+              .join("")
+          : `<tr class="table-empty"><td colspan="4">No deposits</td></tr>`;
+      }
+      if (wdBody) {
+        const rows = data.withdrawals || [];
+        wdBody.innerHTML = rows.length
+          ? rows
+              .map(
+                (e) => `<tr>
+                  <td>${esc(fmtWhen(e.createdAt))}</td>
+                  <td>${esc(e.method)}</td>
+                  <td>${esc(moneyDollars(e.amount))}</td>
+                  <td>${esc(e.games || "—")}</td>
+                </tr>`
+              )
+              .join("")
+          : `<tr class="table-empty"><td colspan="4">No withdrawals</td></tr>`;
+      }
+      if (spinBody) {
+        const rows = data.spins || [];
+        spinBody.innerHTML = rows.length
+          ? rows
+              .map(
+                (s) => `<tr>
+                  <td>${esc(fmtWhen(s.claimedAt || s.createdAt))}</td>
+                  <td>${esc(s.prizeLabel || "—")}</td>
+                  <td>${s.claimed ? "Yes" : "Pending"}</td>
+                </tr>`
+              )
+              .join("")
+          : `<tr class="table-empty"><td colspan="3">No spins</td></tr>`;
+      }
+      box.hidden = false;
+      box.scrollIntoView({ behavior: "smooth", block: "start" });
+      setStatus("customers-status", "History loaded");
+    } catch (err) {
+      setStatus("customers-status", err.message, true);
+    }
   }
 
   function renderCustomers() {
@@ -855,7 +1078,11 @@
     if (!body) return;
 
     if (!customers.length) {
-      body.innerHTML = `<tr class="table-empty"><td colspan="5">No customers yet. They appear here when someone starts a support chat.</td></tr>`;
+      body.innerHTML = `<tr class="table-empty"><td colspan="5">${
+        customerSearchQ
+          ? "No customers match that name."
+          : "No customers yet. They appear here when someone starts a support chat."
+      }</td></tr>`;
       return;
     }
 
@@ -868,12 +1095,17 @@
         <td data-label="Email"><input data-field="email" value="${esc(c.email || "")}" /></td>
         <td data-label="Updated">${c.updatedAt ? new Date(c.updatedAt).toLocaleString() : "—"}</td>
         <td data-label="Actions" class="user-actions">
+          <button type="button" class="btn-mini" data-history-customer="${esc(c.id)}">History</button>
           <button type="button" class="btn-mini" data-save-customer="${esc(c.id)}">Save</button>
           <button type="button" class="btn-mini danger" data-del-customer="${esc(c.id)}">Delete</button>
         </td>
       </tr>`
       )
       .join("");
+
+    body.querySelectorAll("[data-history-customer]").forEach((btn) => {
+      btn.addEventListener("click", () => openCustomerHistory(btn.dataset.historyCustomer));
+    });
 
     body.querySelectorAll("[data-save-customer]").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -900,6 +1132,7 @@
         if (!confirm("Delete this customer?")) return;
         try {
           await api(`/api/admin/customers/${btn.dataset.delCustomer}`, { method: "DELETE" });
+          hideCustomerHistory();
           setStatus("customers-status", "Customer deleted");
           await loadCustomers();
         } catch (err) {
@@ -908,6 +1141,31 @@
       });
     });
   }
+
+  document.getElementById("customer-search-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const q = document.getElementById("customer-search-q")?.value || "";
+    try {
+      await loadCustomers(q);
+      setStatus("customers-status", q ? `Search: ${q}` : "Showing all");
+    } catch (err) {
+      setStatus("customers-status", err.message, true);
+    }
+  });
+
+  document.getElementById("customer-search-clear")?.addEventListener("click", async () => {
+    const input = document.getElementById("customer-search-q");
+    if (input) input.value = "";
+    hideCustomerHistory();
+    try {
+      await loadCustomers("");
+      setStatus("customers-status", "Showing all");
+    } catch (err) {
+      setStatus("customers-status", err.message, true);
+    }
+  });
+
+  document.getElementById("customer-history-close")?.addEventListener("click", () => hideCustomerHistory());
 
   document.getElementById("add-customer-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1115,12 +1373,38 @@
       threadContact.innerHTML = lines.map((l) => `<div>${esc(l)}</div>`).join("");
       threadContact.hidden = lines.length === 0;
     }
+    const delBtn = document.getElementById("delete-chat-btn");
+    if (delBtn) delBtn.hidden = !isAdminUser();
     threadForm.hidden = false;
     showChatThread();
     renderThread();
     await refreshChats();
     scanThreadForJuwa();
   }
+
+  document.getElementById("delete-chat-btn")?.addEventListener("click", async () => {
+    if (!isAdminUser()) return;
+    if (!activeId) return;
+    if (!confirm("Delete this chat permanently? This cannot be undone.")) return;
+    try {
+      await api(`/api/admin/chats/${activeId}`, { method: "DELETE" });
+      activeId = null;
+      activeMessages = [];
+      threadForm.hidden = true;
+      const delBtn = document.getElementById("delete-chat-btn");
+      if (delBtn) delBtn.hidden = true;
+      if (threadName) threadName.textContent = "Select a conversation";
+      if (threadContact) {
+        threadContact.innerHTML = "";
+        threadContact.hidden = true;
+      }
+      threadBody.innerHTML = "";
+      showChatList();
+      await refreshChats();
+    } catch (err) {
+      alert(err.message || "Could not delete chat");
+    }
+  });
 
   function renderThread() {
     threadBody.innerHTML = activeMessages
@@ -1322,6 +1606,7 @@
   const juwaModalUsername = document.getElementById("juwa-modal-username");
   const juwaModalAmount = document.getElementById("juwa-modal-amount");
   const juwaModalGame = document.getElementById("juwa-modal-game");
+  const juwaModalMethod = document.getElementById("juwa-modal-method");
   const juwaModalSource = document.getElementById("juwa-modal-source");
   const juwaModalError = document.getElementById("juwa-modal-error");
   const juwaModalStatus = document.getElementById("juwa-modal-status");
@@ -1368,6 +1653,7 @@
       juwaModalUsername.value = req.username || (Array.isArray(req.usernames) && req.usernames[0]) || "";
     }
     if (juwaModalGame) juwaModalGame.value = req.game || "";
+    if (juwaModalMethod) juwaModalMethod.value = req.method || "";
     if (juwaModalAmount) juwaModalAmount.value = req.amount != null ? String(req.amount) : "";
     if (juwaModalSource) {
       juwaModalSource.value = `Conversation: ${req.conversationId || ""}\n${req.messageText || ""}`;
@@ -1452,8 +1738,8 @@
         "juwa-ops-status",
         autoOn
           ? `Juwa ${juwaOk ? "ready" : "missing creds"} · Juwa2 ${juwa2Ok ? "ready" : "missing creds"} · MilkyWay ${mwOk ? "ready" : "missing creds"} · GameVault ${gvOk ? "ready" : "missing creds"} · Orion ${orionOk ? "ready" : "missing creds"} · auto-process ${status.autoProcess === false ? "off" : "on"}`
-          : "Automation disabled (set JUWA_AUTOMATION_ENABLED=1 / JUWA2_AUTOMATION_ENABLED=1 / MILKYWAY_AUTOMATION_ENABLED=1 / GAMEVAULT_AUTOMATION_ENABLED=1 / ORION_AUTOMATION_ENABLED=1)",
-        !autoOn || !juwaOk || !juwa2Ok || !mwOk || !gvOk || !orionOk
+          : "Manual mode — fill the form above (automation off)",
+        autoOn && (!juwaOk || !juwa2Ok || !mwOk || !gvOk || !orionOk)
       );
       const data = await api("/api/admin/juwa/requests?limit=40");
       const rows = data.requests || [];
@@ -1465,6 +1751,7 @@
               <td data-label="When">${esc(when)}</td>
               <td data-label="Game">${esc(r.game || "—")}</td>
               <td data-label="Username"><code>${esc(r.username || "—")}</code></td>
+              <td data-label="Method">${esc(r.method || "—")}</td>
               <td data-label="Amount">${r.amount != null ? esc(r.amount) : "—"}</td>
               <td data-label="Status">${esc(r.status)}</td>
               <td data-label="Admin">${esc(r.confirmedBy || "—")}</td>
@@ -1474,7 +1761,7 @@
             </tr>`;
             })
             .join("")
-        : `<tr class="table-empty"><td colspan="7">No add-funds requests yet.</td></tr>`;
+        : `<tr class="table-empty"><td colspan="8">No add-funds requests yet.</td></tr>`;
 
       body.querySelectorAll("[data-juwa-open]").forEach((btn) => {
         btn.addEventListener("click", async () => {
@@ -1516,6 +1803,33 @@
     document.getElementById("juwa-modal-cancel")?.addEventListener("click", () => closeJuwaModal());
     document.getElementById("refresh-juwa-btn")?.addEventListener("click", () => loadJuwaOps());
 
+    async function submitManualJuwa(markAdded) {
+      const game = document.getElementById("manual-juwa-game")?.value || "";
+      const username = document.getElementById("manual-juwa-username")?.value || "";
+      const method = document.getElementById("manual-juwa-method")?.value || "";
+      const amount = document.getElementById("manual-juwa-amount")?.value || "";
+      try {
+        const data = await api("/api/admin/juwa/requests/manual", {
+          method: "POST",
+          body: JSON.stringify({ game, username, method, amount, markAdded: markAdded ? "1" : "0" }),
+        });
+        document.getElementById("manual-juwa-form")?.reset();
+        setStatus("juwa-ops-status", data.message || "Saved");
+        await loadJuwaOps();
+        if (!markAdded && data.request) openJuwaModal(data.request);
+      } catch (err) {
+        setStatus("juwa-ops-status", err.message || "Could not save", true);
+      }
+    }
+
+    document.getElementById("manual-juwa-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      await submitManualJuwa(false);
+    });
+    document.getElementById("manual-juwa-mark")?.addEventListener("click", async () => {
+      await submitManualJuwa(true);
+    });
+
     document.querySelector('.nav-btn[data-tab="juwa"]')?.addEventListener("click", () => {
       loadJuwaOps().catch(() => {});
     });
@@ -1525,6 +1839,7 @@
       const username = String(juwaModalUsername?.value || "").trim();
       const amount = Number(juwaModalAmount?.value);
       const game = String(juwaModalGame?.value || juwaActiveRequest.game || "").trim().toLowerCase();
+      const method = String(juwaModalMethod?.value || juwaActiveRequest.method || "").trim();
       if (!username || !Number.isFinite(amount) || amount <= 0) {
         if (juwaModalError) {
           juwaModalError.hidden = false;
@@ -1540,7 +1855,7 @@
       try {
         const data = await api(`/api/admin/juwa/requests/${juwaActiveRequest.id}/mark-added`, {
           method: "POST",
-          body: JSON.stringify({ username, amount, game }),
+          body: JSON.stringify({ username, amount, game, method }),
         });
         juwaActiveRequest = data.request || juwaActiveRequest;
         if (juwaModalStatus) {

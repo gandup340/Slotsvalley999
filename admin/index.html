@@ -66,12 +66,13 @@
           <button type="button" class="nav-btn" data-tab="payments" data-title="Payments" data-admin-only>Payments</button>
           <button type="button" class="nav-btn" data-tab="spin" data-title="Spin game">Spin game</button>
           <button type="button" class="nav-btn" data-tab="customers" data-title="Customers">Customers</button>
+          <button type="button" class="nav-btn" data-tab="dashboard" data-title="Dashboard" data-admin-only>Dashboard</button>
           <button type="button" class="nav-btn" data-tab="users" data-title="Users" data-admin-only>Users</button>
-          <button type="button" class="nav-btn" data-tab="push" data-title="Push" data-admin-only>Push</button>
+          <button type="button" class="nav-btn" data-tab="notify" data-title="Notify">Notify</button>
           <button type="button" class="nav-btn" data-tab="deposits" data-title="Deposits" data-admin-only>Deposits</button>
           <button type="button" class="nav-btn" data-tab="withdrawals" data-title="Withdrawals" data-admin-only>Withdrawals</button>
           <button type="button" class="nav-btn" data-tab="players" data-title="Players" data-admin-only>Players</button>
-          <button type="button" class="nav-btn" data-tab="juwa" data-title="Add funds" data-admin-only>Add funds</button>
+          <button type="button" class="nav-btn" data-tab="juwa" data-title="Add funds">Add funds</button>
         </nav>
         <div class="side-foot">
           <p class="signed-in" id="signed-in"></p>
@@ -102,6 +103,16 @@
                   <strong id="thread-name">Select a conversation</strong>
                   <div class="thread-contact" id="thread-contact" hidden></div>
                 </div>
+                <button
+                  type="button"
+                  class="btn-mini danger"
+                  id="delete-chat-btn"
+                  data-admin-only
+                  hidden
+                  title="Delete this chat"
+                >
+                  Delete chat
+                </button>
               </div>
               <div class="juwa-banner" id="juwa-banner" hidden>
                 <div class="juwa-banner-copy">
@@ -326,9 +337,23 @@
           <header class="panel-head row">
             <div>
               <h2>Customers</h2>
-              <p>All customer names, phone numbers, and emails from the site chat.</p>
+              <p>Search by name and open history for deposits, withdrawals, and spins.</p>
             </div>
           </header>
+
+          <form class="user-form" id="customer-search-form">
+            <div class="user-form-grid">
+              <label>
+                Search by name
+                <input type="search" id="customer-search-q" placeholder="Type a player name…" autocomplete="off" />
+              </label>
+            </div>
+            <div class="panel-actions">
+              <button type="submit" class="btn btn-gold">Search</button>
+              <button type="button" class="btn btn-line" id="customer-search-clear">Clear</button>
+              <span class="status" id="customers-status"></span>
+            </div>
+          </form>
 
           <form class="user-form" id="add-customer-form">
             <h3>Add customer</h3>
@@ -348,7 +373,6 @@
             </div>
             <div class="panel-actions">
               <button type="submit" class="btn btn-gold">Add customer</button>
-              <span class="status" id="customers-status"></span>
             </div>
           </form>
 
@@ -366,13 +390,119 @@
               <tbody id="customers-body"></tbody>
             </table>
           </div>
+
+          <div class="customer-history" id="customer-history" hidden>
+            <header class="panel-head row">
+              <div>
+                <h3 id="customer-history-title">Customer history</h3>
+                <p id="customer-history-sub"></p>
+              </div>
+              <button type="button" class="btn btn-line" id="customer-history-close">Close</button>
+            </header>
+            <div class="dash-cards" id="customer-history-totals"></div>
+            <h4>Deposits (in)</h4>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Method</th>
+                    <th>Amount</th>
+                    <th>Games</th>
+                  </tr>
+                </thead>
+                <tbody id="customer-history-deposits"></tbody>
+              </table>
+            </div>
+            <h4>Withdrawals (out)</h4>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Method</th>
+                    <th>Amount</th>
+                    <th>Games</th>
+                  </tr>
+                </thead>
+                <tbody id="customer-history-withdrawals"></tbody>
+              </table>
+            </div>
+            <h4>Spins</h4>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Prize</th>
+                    <th>Claimed</th>
+                  </tr>
+                </thead>
+                <tbody id="customer-history-spins"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="tab-dashboard" data-admin-only>
+          <header class="panel-head row">
+            <div>
+              <h2>Daily cash dashboard</h2>
+              <p>Total and per-player in / out for the selected day.</p>
+            </div>
+          </header>
+          <form class="user-form" id="dashboard-form">
+            <div class="user-form-grid">
+              <label>
+                Date
+                <input type="date" id="dashboard-date" required />
+              </label>
+            </div>
+            <div class="panel-actions">
+              <button type="submit" class="btn btn-gold">Load day</button>
+              <span class="status" id="dashboard-status"></span>
+            </div>
+          </form>
+          <div class="dash-cards" id="dashboard-cards"></div>
+          <h3>By player</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>In</th>
+                  <th>Out</th>
+                  <th>Net</th>
+                  <th># Dep</th>
+                  <th># Wd</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-players-body"></tbody>
+            </table>
+          </div>
+          <h3>Day entries</h3>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Player</th>
+                  <th>Method</th>
+                  <th>Amount</th>
+                  <th>Games</th>
+                  <th>When</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-entries-body"></tbody>
+            </table>
+          </div>
         </section>
 
         <section class="panel" id="tab-users" data-admin-only>
           <header class="panel-head row">
             <div>
               <h2>Users</h2>
-              <p>Add Admin (full access) or Support (chat, spin, top 3, customers).</p>
+              <p>Add Admin (full access) or Support (chat, spin, top 3, customers, add-funds ops, notify).</p>
             </div>
           </header>
 
@@ -390,7 +520,7 @@
               <label>
                 Role
                 <select id="new-user-role" required>
-                  <option value="support">Support — chat, spin, top 3, customers</option>
+                  <option value="support">Support — chat, spin, top 3, customers, add funds, notify</option>
                   <option value="admin">Admin — full access</option>
                 </select>
               </label>
@@ -421,12 +551,19 @@
           </div>
         </section>
 
-        <section class="panel" id="tab-push">
+        <section class="panel" id="tab-notify">
           <header class="panel-head">
-            <h2>Push notifications</h2>
-            <p>Send a notification to phones that enabled alerts on the website.</p>
+            <h2>Notify players</h2>
+            <p>Send bonus / offer push alerts to phones that enabled notifications on the site. Admin and Support can send.</p>
             <p id="push-meta" class="status" style="margin-top:0.5rem"></p>
           </header>
+
+          <div class="notify-templates" id="notify-templates">
+            <h3>Templates</h3>
+            <p class="notify-templates-lead">Click a template to fill the form, then edit and send.</p>
+            <div class="notify-template-grid" id="notify-template-grid"></div>
+          </div>
+
           <form class="contact-form" id="push-form">
             <label>
               Title
@@ -434,7 +571,7 @@
             </label>
             <label>
               Message
-              <input type="text" id="push-body" maxlength="180" placeholder="New update for players" required />
+              <textarea id="push-body" maxlength="180" rows="3" placeholder="Bonus or offer message" required></textarea>
             </label>
             <label>
               Open URL (optional)
@@ -445,7 +582,7 @@
               <input type="text" id="push-icon" value="/assets/icons/icon-192.png" />
             </label>
             <div class="panel-actions">
-              <button type="submit" class="btn btn-gold">Send to all devices</button>
+              <button type="submit" class="btn btn-gold">Send notification</button>
               <span class="status" id="push-status"></span>
             </div>
           </form>
@@ -454,51 +591,101 @@
         <section class="panel" id="tab-deposits">
           <header class="panel-head row">
             <div>
-              <h2>Player deposits</h2>
-              <p>Approve or reject deposit requests from /app/</p>
+              <h2>Deposits (in)</h2>
+              <p>Add, edit, or delete deposit records — player name, method, amount, games.</p>
             </div>
             <button type="button" class="btn btn-gold" id="refresh-deposits-btn">Refresh</button>
           </header>
+          <form class="user-form" id="add-deposit-form">
+            <h3>Add deposit</h3>
+            <div class="user-form-grid user-form-grid-4">
+              <label>
+                Player name
+                <input type="text" id="new-deposit-name" required maxlength="80" />
+              </label>
+              <label>
+                Method
+                <input type="text" id="new-deposit-method" placeholder="Cash App, Zelle…" required maxlength="60" />
+              </label>
+              <label>
+                Amount
+                <input type="number" id="new-deposit-amount" min="0.01" step="0.01" required />
+              </label>
+              <label>
+                Games
+                <input type="text" id="new-deposit-games" placeholder="Game name(s)" maxlength="80" />
+              </label>
+            </div>
+            <div class="panel-actions">
+              <button type="submit" class="btn btn-gold">Add deposit</button>
+              <span class="status" id="deposits-status"></span>
+            </div>
+          </form>
           <div class="table-wrap">
             <table class="data-table">
               <thead>
                 <tr>
                   <th>Player</th>
-                  <th>Amount</th>
                   <th>Method</th>
-                  <th>Status</th>
+                  <th>Amount</th>
+                  <th>Games</th>
+                  <th>When</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="deposits-body"></tbody>
             </table>
           </div>
-          <span class="status" id="deposits-status"></span>
         </section>
 
         <section class="panel" id="tab-withdrawals">
           <header class="panel-head row">
             <div>
-              <h2>Player withdrawals</h2>
-              <p>Approve or reject withdraw requests</p>
+              <h2>Withdrawals (out)</h2>
+              <p>Add, edit, or delete withdrawal records — player name, method, amount, games.</p>
             </div>
             <button type="button" class="btn btn-gold" id="refresh-withdrawals-btn">Refresh</button>
           </header>
+          <form class="user-form" id="add-withdrawal-form">
+            <h3>Add withdrawal</h3>
+            <div class="user-form-grid user-form-grid-4">
+              <label>
+                Player name
+                <input type="text" id="new-withdrawal-name" required maxlength="80" />
+              </label>
+              <label>
+                Method
+                <input type="text" id="new-withdrawal-method" placeholder="Cash App, Zelle…" required maxlength="60" />
+              </label>
+              <label>
+                Amount
+                <input type="number" id="new-withdrawal-amount" min="0.01" step="0.01" required />
+              </label>
+              <label>
+                Games
+                <input type="text" id="new-withdrawal-games" placeholder="Game name(s)" maxlength="80" />
+              </label>
+            </div>
+            <div class="panel-actions">
+              <button type="submit" class="btn btn-gold">Add withdrawal</button>
+              <span class="status" id="withdrawals-status"></span>
+            </div>
+          </form>
           <div class="table-wrap">
             <table class="data-table">
               <thead>
                 <tr>
                   <th>Player</th>
+                  <th>Method</th>
                   <th>Amount</th>
-                  <th>Destination</th>
-                  <th>Status</th>
+                  <th>Games</th>
+                  <th>When</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="withdrawals-body"></tbody>
             </table>
           </div>
-          <span class="status" id="withdrawals-status"></span>
         </section>
 
         <section class="panel" id="tab-players">
@@ -533,11 +720,45 @@
           <header class="panel-head row">
             <div>
               <h2>Add-funds ops</h2>
-              <p>Chat requests for Juwa, Juwa 2, MilkyWay, GameVault, and Orion. Auto-add replies with the game name.</p>
+              <p>Fill game, username, and amount manually. Admin and Support can save or mark added. Chat detection is optional.</p>
             </div>
             <button type="button" class="btn btn-gold" id="refresh-juwa-btn">Refresh</button>
           </header>
-          <p class="status" id="juwa-ops-status"></p>
+
+          <form class="user-form" id="manual-juwa-form">
+            <h3>Manual add funds</h3>
+            <div class="user-form-grid user-form-grid-4">
+              <label>
+                Game
+                <select id="manual-juwa-game" required>
+                  <option value="">Select game</option>
+                  <option value="juwa">Juwa</option>
+                  <option value="juwa2">Juwa 2</option>
+                  <option value="milkyway">MilkyWay</option>
+                  <option value="gamevault">GameVault</option>
+                  <option value="orion">Orion</option>
+                </select>
+              </label>
+              <label>
+                Username
+                <input type="text" id="manual-juwa-username" maxlength="64" required autocomplete="off" />
+              </label>
+              <label>
+                Method
+                <input type="text" id="manual-juwa-method" placeholder="Cash App, Zelle…" maxlength="60" required />
+              </label>
+              <label>
+                Amount
+                <input type="number" id="manual-juwa-amount" min="0.01" step="0.01" required />
+              </label>
+            </div>
+            <div class="panel-actions">
+              <button type="submit" class="btn btn-line" id="manual-juwa-save">Save request</button>
+              <button type="button" class="btn btn-gold" id="manual-juwa-mark">Save &amp; mark added</button>
+              <span class="status" id="juwa-ops-status"></span>
+            </div>
+          </form>
+
           <div class="table-wrap">
             <table class="data-table">
               <thead>
@@ -545,6 +766,7 @@
                   <th>When</th>
                   <th>Game</th>
                   <th>Username</th>
+                  <th>Method</th>
                   <th>Amount</th>
                   <th>Status</th>
                   <th>Admin</th>
@@ -597,6 +819,10 @@
         <label>
           Username
           <input id="juwa-modal-username" type="text" maxlength="64" autocomplete="off" />
+        </label>
+        <label>
+          Method
+          <input id="juwa-modal-method" type="text" maxlength="60" placeholder="Cash App, Zelle…" autocomplete="off" />
         </label>
         <label>
           Amount to add

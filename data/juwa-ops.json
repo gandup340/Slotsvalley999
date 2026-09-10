@@ -1,0 +1,161 @@
+{
+  "requests": [
+    {
+      "id": "58fd2f11-dcb4-4aa5-8847-f36e4d7871aa",
+      "fingerprint": "a739b589-215e-4347-a85b-773cc99d536d|321c1754-1864-4033-a660-6dcdb85aebdb|juwa||",
+      "conversationId": "a739b589-215e-4347-a85b-773cc99d536d",
+      "messageId": "321c1754-1864-4033-a660-6dcdb85aebdb",
+      "messageText": "this is my payment can you add to juwa",
+      "username": null,
+      "amount": null,
+      "game": "juwa",
+      "usernames": [],
+      "missing": [
+        "username",
+        "amount"
+      ],
+      "reason": "Need: username, amount",
+      "status": "needs_info",
+      "createdAt": 1789046347715,
+      "updatedAt": 1789046347715,
+      "confirmedBy": null,
+      "confirmedAt": null,
+      "error": "",
+      "result": null,
+      "idempotencyKey": "a739b589-215e-4347-a85b-773cc99d536d|321c1754-1864-4033-a660-6dcdb85aebdb|juwa||"
+    },
+    {
+      "id": "9287c7c3-1a54-47e1-b326-2e3b715b9b7e",
+      "fingerprint": "a739b589-215e-4347-a85b-773cc99d536d|321c1754-1864-4033-a660-6dcdb85aebdb|juwa||",
+      "conversationId": "a739b589-215e-4347-a85b-773cc99d536d",
+      "messageId": "321c1754-1864-4033-a660-6dcdb85aebdb",
+      "messageText": "this is my payment can you add to juwa",
+      "username": null,
+      "amount": null,
+      "game": "juwa",
+      "usernames": [],
+      "missing": [
+        "username",
+        "amount"
+      ],
+      "reason": "Need: username, amount",
+      "status": "needs_info",
+      "createdAt": 1789046340954,
+      "updatedAt": 1789046340954,
+      "confirmedBy": null,
+      "confirmedAt": null,
+      "error": "",
+      "result": null,
+      "idempotencyKey": "a739b589-215e-4347-a85b-773cc99d536d|321c1754-1864-4033-a660-6dcdb85aebdb|juwa||"
+    },
+    {
+      "id": "aac4bedb-1a6c-4068-b937-89ea596cb9ce",
+      "fingerprint": "a739b589-215e-4347-a85b-773cc99d536d|321c1754-1864-4033-a660-6dcdb85aebdb|juwa||",
+      "conversationId": "a739b589-215e-4347-a85b-773cc99d536d",
+      "messageId": "321c1754-1864-4033-a660-6dcdb85aebdb",
+      "messageText": "this is my payment can you add to juwa",
+      "username": null,
+      "amount": null,
+      "game": "juwa",
+      "usernames": [],
+      "missing": [
+        "username",
+        "amount"
+      ],
+      "reason": "Need: username, amount",
+      "status": "needs_info",
+      "createdAt": 1789046337653,
+      "updatedAt": 1789046337653,
+      "confirmedBy": null,
+      "confirmedAt": null,
+      "error": "",
+      "result": null,
+      "idempotencyKey": "a739b589-215e-4347-a85b-773cc99d536d|321c1754-1864-4033-a660-6dcdb85aebdb|juwa||"
+    },
+    {
+      "id": "6f86b1bc-ada1-4c16-adf2-c3bd3f9fa07a",
+      "fingerprint": "||juwa2|sos|123",
+      "conversationId": "",
+      "messageId": "",
+      "messageText": "Manual entry by admin",
+      "username": "SOS",
+      "amount": 123,
+      "game": "juwa2",
+      "usernames": [
+        "SOS"
+      ],
+      "missing": [],
+      "reason": "Marked added manually",
+      "status": "success",
+      "createdAt": 1789046301048,
+      "updatedAt": 1789046301052,
+      "confirmedBy": "admin",
+      "confirmedAt": 1789046301051,
+      "error": "",
+      "result": {
+        "ok": true,
+        "status": "success",
+        "detail": "Manual mark added (no chat reply)"
+      },
+      "idempotencyKey": "||juwa2|sos|123",
+      "playerRepliedAt": 1789046301051
+    }
+  ],
+  "audits": [
+    {
+      "id": "94a34d6e-bc1e-4e51-a152-765a8add7138",
+      "at": 1789046347717,
+      "type": "request_created",
+      "requestId": "58fd2f11-dcb4-4aa5-8847-f36e4d7871aa",
+      "admin": "admin",
+      "username": null,
+      "amount": null,
+      "status": "needs_info",
+      "message": "Created from chat"
+    },
+    {
+      "id": "1d25492a-0fa9-44f7-b16f-1cb3f63efdfe",
+      "at": 1789046340956,
+      "type": "request_created",
+      "requestId": "9287c7c3-1a54-47e1-b326-2e3b715b9b7e",
+      "admin": "admin",
+      "username": null,
+      "amount": null,
+      "status": "needs_info",
+      "message": "Created from chat"
+    },
+    {
+      "id": "20fd72cc-d5ad-422b-a09d-26d424f89a36",
+      "at": 1789046337654,
+      "type": "request_created",
+      "requestId": "aac4bedb-1a6c-4068-b937-89ea596cb9ce",
+      "admin": "admin",
+      "username": null,
+      "amount": null,
+      "status": "needs_info",
+      "message": "Created from chat"
+    },
+    {
+      "id": "3da9f916-94b5-47eb-9f36-f67185f6b0c9",
+      "at": 1789046301053,
+      "type": "marked_added",
+      "requestId": "6f86b1bc-ada1-4c16-adf2-c3bd3f9fa07a",
+      "admin": "admin",
+      "username": "SOS",
+      "amount": 123,
+      "status": "success",
+      "message": "Manual mark added"
+    },
+    {
+      "id": "2279f3c1-07c2-49ad-a335-99a10a15e0ca",
+      "at": 1789046301050,
+      "type": "request_created",
+      "requestId": "6f86b1bc-ada1-4c16-adf2-c3bd3f9fa07a",
+      "admin": "admin",
+      "username": "SOS",
+      "amount": 123,
+      "status": "pending_review",
+      "message": "Created manually"
+    }
+  ]
+}

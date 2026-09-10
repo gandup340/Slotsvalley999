@@ -299,9 +299,8 @@
       "id": "u_admin",
       "username": "admin",
       "name": "Admin",
-      "passwordHash": "$2b$12$5EsPTN.U7P8crVKuMfuCNu5bGUhR6Zj0Tou02Ag8xKqQ0.P06Hwuu",
+      "passwordHash": "$2b$12$QPnW/4o547clx0GvaZBwWuHyg/aDDn0Yei.YJrD.wTzGoEuXRKRWO",
       "role": "admin",
-      "mustReset": true,
       "createdAt": 1784950042727
     },
     {

@@ -27,6 +27,7 @@ const CHATS_PATH = path.join(DATA_DIR, "chats.json");
 const CUSTOMERS_PATH = path.join(DATA_DIR, "customers.json");
 const SPINS_PATH = path.join(DATA_DIR, "spins.json");
 const PUSH_SUBS_PATH = path.join(DATA_DIR, "push-subscriptions.json");
+const CASH_LEDGER_PATH = path.join(DATA_DIR, "cash-ledger.json");
 const UPLOADS_CHAT_DIR = path.join(ROOT, "uploads", "chat");
 const BCRYPT_ROUNDS = 12;
 const MIN_PASSWORD_LENGTH = IS_PROD ? 10 : 6;
@@ -520,6 +521,60 @@ function getCustomers() {
 
 function saveCustomers(data) {
   writeJson(CUSTOMERS_PATH, data);
+}
+
+function getCashLedger() {
+  const data = readJson(CASH_LEDGER_PATH, { entries: [] });
+  if (!Array.isArray(data.entries)) data.entries = [];
+  return data;
+}
+
+function saveCashLedger(data) {
+  writeJson(CASH_LEDGER_PATH, data);
+}
+
+function normalizeCashType(type) {
+  return String(type || "").toLowerCase() === "withdrawal" ? "withdrawal" : "deposit";
+}
+
+function parseCashAmount(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.round(value * 100) / 100;
+  const raw = String(value || "").replace(/[^0-9.-]/g, "");
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n * 100) / 100;
+}
+
+function dayKeyFromMs(ms) {
+  const d = new Date(Number(ms) || Date.now());
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function sameDayKey(ms, key) {
+  return dayKeyFromMs(ms) === key;
+}
+
+function namesMatch(a, b) {
+  const left = String(a || "").trim().toLowerCase();
+  const right = String(b || "").trim().toLowerCase();
+  if (!left || !right) return false;
+  return left === right || left.includes(right) || right.includes(left);
+}
+
+function publicCashEntry(entry) {
+  return {
+    id: entry.id,
+    type: normalizeCashType(entry.type),
+    playerName: entry.playerName || "",
+    method: entry.method || "",
+    amount: Number(entry.amount || 0),
+    games: entry.games || "",
+    createdAt: entry.createdAt || null,
+    updatedAt: entry.updatedAt || null,
+  };
 }
 
 function getPushSubscriptions() {
@@ -1931,12 +1986,22 @@ app.delete("/api/admin/users/:id", auth, requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/admin/customers", auth, (_req, res) => {
+app.get("/api/admin/customers", auth, (req, res) => {
   const data = getCustomers();
-  const customers = [...(data.customers || [])].sort(
-    (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)
-  );
-  res.json({ customers });
+  const q = String(req.query?.q || req.query?.name || "")
+    .trim()
+    .toLowerCase();
+  let customers = [...(data.customers || [])];
+  if (q) {
+    customers = customers.filter((c) => {
+      const name = String(c.name || "").toLowerCase();
+      const phone = String(c.phone || "").toLowerCase();
+      const email = String(c.email || "").toLowerCase();
+      return name.includes(q) || phone.includes(q) || email.includes(q);
+    });
+  }
+  customers.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  res.json({ customers, q: q || null });
 });
 
 app.post("/api/admin/customers", auth, (req, res) => {
@@ -1988,6 +2053,188 @@ app.delete("/api/admin/customers/:id", auth, (req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/api/admin/customers/:id/history", auth, (req, res) => {
+  const data = getCustomers();
+  const customer = (data.customers || []).find((c) => c.id === req.params.id);
+  if (!customer) return res.status(404).json({ error: "Customer not found" });
+
+  const ledger = getCashLedger().entries || [];
+  const deposits = ledger
+    .filter((e) => normalizeCashType(e.type) === "deposit" && namesMatch(e.playerName, customer.name))
+    .map(publicCashEntry)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const withdrawals = ledger
+    .filter((e) => normalizeCashType(e.type) === "withdrawal" && namesMatch(e.playerName, customer.name))
+    .map(publicCashEntry)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  const phoneDigs = phoneDigits(customer.phone);
+  const email = normalizeEmail(customer.email);
+  const spins = (getSpins().spins || [])
+    .filter((s) => {
+      if (namesMatch(s.name, customer.name)) return true;
+      if (email && normalizeEmail(s.email) === email) return true;
+      if (phoneDigs && (phoneDigits(s.phone) === phoneDigs || String(s.phoneDigits || "") === phoneDigs)) {
+        return true;
+      }
+      return false;
+    })
+    .map((s) => ({
+      id: s.id,
+      prizeLabel: s.prizeLabel || "",
+      claimed: Boolean(s.claimed),
+      name: s.name || "",
+      phone: s.phone || "",
+      email: s.email || "",
+      createdAt: s.createdAt || null,
+      claimedAt: s.claimedAt || null,
+    }))
+    .sort((a, b) => (b.claimedAt || b.createdAt || 0) - (a.claimedAt || a.createdAt || 0));
+
+  const totalIn = deposits.reduce((n, e) => n + Number(e.amount || 0), 0);
+  const totalOut = withdrawals.reduce((n, e) => n + Number(e.amount || 0), 0);
+
+  res.json({
+    customer,
+    deposits,
+    withdrawals,
+    spins,
+    totals: {
+      in: Math.round(totalIn * 100) / 100,
+      out: Math.round(totalOut * 100) / 100,
+      net: Math.round((totalIn - totalOut) * 100) / 100,
+    },
+  });
+});
+
+app.get("/api/admin/cash", auth, requireAdmin, (req, res) => {
+  const type = String(req.query?.type || "").toLowerCase();
+  let entries = (getCashLedger().entries || []).map(publicCashEntry);
+  if (type === "deposit" || type === "withdrawal") {
+    entries = entries.filter((e) => e.type === type);
+  }
+  entries.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  res.json({ entries });
+});
+
+app.post("/api/admin/cash", auth, requireAdmin, (req, res) => {
+  const type = normalizeCashType(req.body?.type);
+  const playerName = String(req.body?.playerName || req.body?.name || "").trim().slice(0, 80);
+  const method = String(req.body?.method || "").trim().slice(0, 60);
+  const games = String(req.body?.games || "").trim().slice(0, 80);
+  const amount = parseCashAmount(req.body?.amount);
+  if (!playerName) return res.status(400).json({ error: "Player name is required" });
+  if (!method) return res.status(400).json({ error: "Method is required" });
+  if (amount == null) return res.status(400).json({ error: "Enter a valid amount greater than 0" });
+
+  const now = Date.now();
+  const entry = {
+    id: crypto.randomUUID(),
+    type,
+    playerName,
+    method,
+    amount,
+    games,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const data = getCashLedger();
+  data.entries = data.entries || [];
+  data.entries.unshift(entry);
+  saveCashLedger(data);
+  upsertCustomer({
+    name: playerName,
+    phone: req.body?.phone || "",
+    email: req.body?.email || "",
+  });
+  res.json({ ok: true, entry: publicCashEntry(entry) });
+});
+
+app.put("/api/admin/cash/:id", auth, requireAdmin, (req, res) => {
+  const data = getCashLedger();
+  const entry = (data.entries || []).find((e) => e.id === req.params.id);
+  if (!entry) return res.status(404).json({ error: "Entry not found" });
+
+  if (req.body?.type != null) entry.type = normalizeCashType(req.body.type);
+  if (req.body?.playerName != null || req.body?.name != null) {
+    const playerName = String(req.body?.playerName || req.body?.name || "").trim().slice(0, 80);
+    if (!playerName) return res.status(400).json({ error: "Player name is required" });
+    entry.playerName = playerName;
+  }
+  if (req.body?.method != null) {
+    const method = String(req.body.method || "").trim().slice(0, 60);
+    if (!method) return res.status(400).json({ error: "Method is required" });
+    entry.method = method;
+  }
+  if (req.body?.games != null) entry.games = String(req.body.games || "").trim().slice(0, 80);
+  if (req.body?.amount != null) {
+    const amount = parseCashAmount(req.body.amount);
+    if (amount == null) return res.status(400).json({ error: "Enter a valid amount greater than 0" });
+    entry.amount = amount;
+  }
+  entry.updatedAt = Date.now();
+  saveCashLedger(data);
+  res.json({ ok: true, entry: publicCashEntry(entry) });
+});
+
+app.delete("/api/admin/cash/:id", auth, requireAdmin, (req, res) => {
+  const data = getCashLedger();
+  const before = (data.entries || []).length;
+  data.entries = (data.entries || []).filter((e) => e.id !== req.params.id);
+  if (data.entries.length === before) {
+    return res.status(404).json({ error: "Entry not found" });
+  }
+  saveCashLedger(data);
+  res.json({ ok: true });
+});
+
+app.get("/api/admin/cash-dashboard", auth, requireAdmin, (req, res) => {
+  const today = dayKeyFromMs(Date.now());
+  const date = String(req.query?.date || today).trim() || today;
+  const entries = (getCashLedger().entries || []).filter((e) => sameDayKey(e.createdAt, date));
+
+  let totalIn = 0;
+  let totalOut = 0;
+  const byPlayerMap = new Map();
+
+  for (const raw of entries) {
+    const e = publicCashEntry(raw);
+    const name = e.playerName || "Unknown";
+    if (!byPlayerMap.has(name)) {
+      byPlayerMap.set(name, { playerName: name, in: 0, out: 0, net: 0, deposits: 0, withdrawals: 0 });
+    }
+    const row = byPlayerMap.get(name);
+    if (e.type === "deposit") {
+      totalIn += e.amount;
+      row.in += e.amount;
+      row.deposits += 1;
+    } else {
+      totalOut += e.amount;
+      row.out += e.amount;
+      row.withdrawals += 1;
+    }
+  }
+
+  const byPlayer = [...byPlayerMap.values()]
+    .map((row) => ({
+      ...row,
+      in: Math.round(row.in * 100) / 100,
+      out: Math.round(row.out * 100) / 100,
+      net: Math.round((row.in - row.out) * 100) / 100,
+    }))
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net) || a.playerName.localeCompare(b.playerName));
+
+  res.json({
+    date,
+    totalIn: Math.round(totalIn * 100) / 100,
+    totalOut: Math.round(totalOut * 100) / 100,
+    net: Math.round((totalIn - totalOut) * 100) / 100,
+    entryCount: entries.length,
+    byPlayer,
+    entries: entries.map(publicCashEntry).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
+  });
+});
+
 app.get("/api/admin/config", auth, requireAdmin, (_req, res) => {
   const cfg = getConfig();
   const pub = publicConfig(cfg);
@@ -2001,7 +2248,7 @@ app.get("/api/admin/config", auth, requireAdmin, (_req, res) => {
   });
 });
 
-app.get("/api/admin/push", auth, requireAdmin, (_req, res) => {
+app.get("/api/admin/push", auth, (_req, res) => {
   const store = getPushSubscriptions();
   res.json({
     configured: PUSH_ENABLED,
@@ -2009,7 +2256,62 @@ app.get("/api/admin/push", auth, requireAdmin, (_req, res) => {
   });
 });
 
-app.post("/api/admin/push/send", auth, requireAdmin, async (req, res) => {
+app.get("/api/admin/push/templates", auth, (_req, res) => {
+  res.json({
+    templates: [
+      {
+        id: "welcome_bonus",
+        label: "Welcome bonus",
+        title: "Welcome bonus ready 🎁",
+        body: "New players: claim your welcome bonus now. Open the app and chat with support.",
+        url: "/?source=push-welcome",
+        tag: "bonus-welcome",
+      },
+      {
+        id: "deposit_match",
+        label: "Deposit match",
+        title: "Deposit match offer 💰",
+        body: "Limited time: get a match bonus on your next deposit. Message us to claim.",
+        url: "/?source=push-deposit",
+        tag: "bonus-deposit",
+      },
+      {
+        id: "free_spins",
+        label: "Free spins",
+        title: "Free spins available 🎡",
+        body: "Spin & Win is live — free spins waiting. Tap to open the wheel.",
+        url: "/spin/?source=push",
+        tag: "bonus-spins",
+      },
+      {
+        id: "weekend_offer",
+        label: "Weekend offer",
+        title: "Weekend special offer 🔥",
+        body: "This weekend only: exclusive reload bonus. Chat support to activate.",
+        url: "/?source=push-weekend",
+        tag: "bonus-weekend",
+      },
+      {
+        id: "vip_reload",
+        label: "VIP reload",
+        title: "VIP reload bonus 👑",
+        body: "VIP circle reload is ready. Open chat to claim your exclusive offer.",
+        url: "/?source=push-vip",
+        tag: "bonus-vip",
+      },
+      {
+        id: "custom",
+        label: "Custom blank",
+        title: "Slots Valley",
+        body: "",
+        url: "/",
+        tag: "slot-valley",
+      },
+    ],
+  });
+});
+
+app.post("/api/admin/push/send", auth, async (req, res) => {
   const title = String(req.body?.title || "").trim();
   const body = String(req.body?.body || "").trim();
   const icon = String(req.body?.icon || "/assets/icons/icon-192.png").trim();
@@ -2022,6 +2324,14 @@ app.post("/api/admin/push/send", auth, requireAdmin, async (req, res) => {
   try {
     const result = await sendPushToAll({ title, body, icon, url, data, tag });
     if (!result.ok) return res.status(503).json(result);
+    auditLog({
+      category: "push",
+      action: "send",
+      actor: req.adminUser?.username || req.adminUser?.name || "staff",
+      ip: auditClientIp(req) || clientIp(req),
+      success: true,
+      message: `sent=${result.sent || 0} failed=${result.failed || 0} title=${title.slice(0, 40)}`,
+    });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err?.message || "Failed to send notifications" });
@@ -2298,7 +2608,7 @@ app.get("/api/admin/chats/:id", auth, (req, res) => {
   res.json(convo);
 });
 
-app.delete("/api/admin/chats/:id", auth, (req, res) => {
+app.delete("/api/admin/chats/:id", auth, requireAdmin, (req, res) => {
   const data = getChats();
   data.conversations = data.conversations.filter((c) => c.id !== req.params.id);
   saveChats(data);
@@ -2756,6 +3066,9 @@ if (!fs.existsSync(CONFIG_PATH)) {
 
 if (!fs.existsSync(CUSTOMERS_PATH)) {
   writeJson(CUSTOMERS_PATH, { customers: [] });
+}
+if (!fs.existsSync(CASH_LEDGER_PATH)) {
+  writeJson(CASH_LEDGER_PATH, { entries: [] });
 }
 backfillCustomersFromChats();
 

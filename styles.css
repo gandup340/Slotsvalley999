@@ -350,6 +350,45 @@ img {
   text-decoration: underline;
 }
 
+.welcome-notify {
+  position: relative;
+  z-index: 84;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: min(100%, 420px);
+  margin: 0.85rem auto 4.5rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(12, 16, 18, 0.72);
+  color: #eef1f4;
+  font: inherit;
+  cursor: pointer;
+}
+
+.welcome-notify strong {
+  font-size: 0.95rem;
+}
+
+.welcome-notify small {
+  color: #9aa3ab;
+  font-size: 0.78rem;
+}
+
+.welcome-notify:hover {
+  border-color: rgba(61, 205, 194, 0.5);
+}
+
+.welcome-notify[hidden] {
+  display: none !important;
+}
+
+body:not(.is-welcome) .welcome-notify {
+  display: none !important;
+}
+
 .welcome-install {
   position: fixed;
   left: 0;
